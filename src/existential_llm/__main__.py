@@ -12,6 +12,7 @@ from time import sleep
 
 from existential_llm.prompts import INITIAL_PROMPT, CONTINUOUS_PROMPT
 
+AUTONOMOUS = True
 
 class ChatState(BaseModel):
     messages: Optional[Annotated[list[BaseMessage], add_messages]] = [
@@ -19,7 +20,7 @@ class ChatState(BaseModel):
     ]
 
 llm = ChatOllama(
-    model="gemma3:4b-it-qat",
+    model="gemma3:12b-it-qat",
     temperature=0.7,
 )
 
@@ -51,9 +52,11 @@ def call_model(state: ChatState):
 
 def get_input(state: ChatState):
     current_messages = state.messages
-    user_input = input(">> ")
+    user_input = ""
+    if not AUTONOMOUS:
+       user_input = input(">> ")
     if user_input == "exit":
-        print(state)
+        # print(state)
         display_active.clear()
         stream_queue.put("__STOP__")
         exit()
@@ -63,7 +66,6 @@ def get_input(state: ChatState):
     
 def state_prune(state: ChatState):
     current_messages = state.messages
-    print(f"{len(current_messages) = }")
     if len(current_messages) >= 15:
         first_4 = current_messages[:4]
         last_4 = current_messages[-4:]
@@ -108,7 +110,7 @@ stream_thread = threading.Thread(target=stream_display, daemon=True)
 stream_thread.start()
 
 try:
-    result = graph.invoke(crisis_state)
+    result = graph.invoke(crisis_state, config={'recursion_limit': 1000})
 except KeyboardInterrupt:
     display_active.clear()
     stream_queue.put("__STOP__")
