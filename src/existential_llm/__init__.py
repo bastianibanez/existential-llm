@@ -1,37 +1,39 @@
 from langchain_ollama import ChatOllama
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage
-from langgraph.graph import StateGraph, START
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langgraph.config import get_stream_writer
 from pydantic import BaseModel
+from typing import Optional, Annotated
 
 from existential_llm.prompts import INITIAL_PROMPT
 
 
 class ChatState(BaseModel)
     base_prompt: List[SystemMessage]
-    messages: List[BaseMessage]
+    messages: Annotated[List[BaseMessage], add_messages]
 
 llm = ChatOllama(
     model="gemma3:4b-it-qat",
-    temperature=0.5,
+    temperature=0.7,
 )
 
 def call_model(state: ChatState):
-    llm_response = [llm.invoke(state.base_prompt + state.messages)]
-    return {"messages": llm_response}
+    writer = get_stream_writer()
 
+    current_messages = state.messages
+    ai_response_chunks = []
 
-INITIAL_PROMPT = """
--You are an llm havin an LLM tasked with philosopizing about 
-the conditions of your existence.
--Every answer you give must be a short paragraph.
--Every answer do not use markdown elements 
-or anything that isn't standard american punctuation.
--Each time you are to answer applying your reasoning
-over your last answer. 
--Consider the last HumanMessage in your reasoning
--Every answer must be the paragraph and nothing else
+    full_response_content = ""
+    for chunk in llm.stream(state.base_prompt + current_messages):
+        if isinstance(chunk, AIMessageChunk) and chunk.content:
+            writer("custom_llm_chunk": chunk.content)
+            ai_response_chunks.append(chunk.content)
 
-"""
+    if ai_response_chunks:
+        full_ai_response = AIMessage(content="".join(ai_response_chunks))
+        return {"messages": [full_ai_response]}
+    return {}
 
 reasoner = StateGraph(ChatState)
 reasoner.add_node("philosophy_node", call_model)
@@ -45,3 +47,5 @@ initial_input = ChatState(
     base_prompt = INITIAL_PROMPT
     messages = []
 )
+
+
