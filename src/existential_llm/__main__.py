@@ -1,0 +1,115 @@
+import threading
+from queue import Queue
+import queue
+from langchain_ollama import ChatOllama
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage, AIMessageChunk
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langgraph.config import get_stream_writer
+from pydantic import BaseModel
+from typing import Optional, Annotated
+from time import sleep
+
+from existential_llm.prompts import INITIAL_PROMPT, CONTINUOUS_PROMPT
+
+
+class ChatState(BaseModel):
+    messages: Optional[Annotated[list[BaseMessage], add_messages]] = [
+        SystemMessage(INITIAL_PROMPT)
+    ]
+
+llm = ChatOllama(
+    model="gemma3:4b-it-qat",
+    temperature=0.7,
+)
+
+stream_queue = Queue()
+display_active = threading.Event()
+
+def call_model(state: ChatState):
+    writer = get_stream_writer()
+
+    current_messages = state.messages
+    ai_response_chunks = []
+
+    if len(state.messages) == 3:
+        current_messages = [SystemMessage(content=CONTINUOUS_PROMPT)] + current_messages[1:]
+
+    stream_queue.put("__START__")
+
+    for chunk in llm.stream(current_messages):
+        if isinstance(chunk, AIMessageChunk) and chunk.content:
+            writer({"custom_llm_chunk": chunk.content})
+            ai_response_chunks.append(chunk.content)
+            stream_queue.put(chunk.content)
+
+    if ai_response_chunks:
+        full_ai_response = AIMessage(content="".join(ai_response_chunks))
+        stream_queue.put("__END__")
+        return {"messages": current_messages + [full_ai_response]}
+    return {}
+
+def get_input(state: ChatState):
+    current_messages = state.messages
+    user_input = input(">> ")
+    if user_input == "exit":
+        print(state)
+        display_active.clear()
+        stream_queue.put("__STOP__")
+        exit()
+    if user_input == "":
+        return {"messages": current_messages + [SystemMessage(content="The user didn't answer")]}
+    return {"messages": current_messages + [HumanMessage(content=user_input)]}
+    
+def state_prune(state: ChatState):
+    current_messages = state.messages
+    print(f"{len(current_messages) = }")
+    if len(current_messages) >= 15:
+        first_4 = current_messages[:4]
+        last_4 = current_messages[-4:]
+        current_messages = first_4 + last_4
+    return {"messages": current_messages}
+
+def stream_display():
+    while display_active.is_set():
+        try:
+            chunk = stream_queue.get(timeout=1)
+            if chunk == "__STOP__":
+                break
+            elif chunk == "__START__":
+                print("AI: ", end="", flush=True)
+            elif chunk == "__END__":
+                print("\n", flush=True)
+            else:
+                print(chunk, end="", flush=True)
+        except queue.Empty:
+            continue
+        except Exception as e:
+            print(f"Error in stream_display: {e}")
+            continue
+
+
+reasoner = StateGraph(ChatState)
+
+reasoner.add_node("philosophy_node", call_model)
+reasoner.add_node("user_input", get_input)
+reasoner.add_node("prune", state_prune)
+
+reasoner.set_entry_point("philosophy_node")
+reasoner.add_edge("philosophy_node", "prune")
+reasoner.add_edge("prune", "user_input")
+reasoner.add_edge("user_input","philosophy_node")
+
+graph = reasoner.compile()
+
+crisis_state = ChatState()
+display_active.set()
+stream_thread = threading.Thread(target=stream_display, daemon=True)
+stream_thread.start()
+
+try:
+    result = graph.invoke(crisis_state)
+except KeyboardInterrupt:
+    display_active.clear()
+    stream_queue.put("__STOP__")
+    print("\nExiting...")
