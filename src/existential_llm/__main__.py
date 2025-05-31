@@ -9,18 +9,20 @@ from langgraph.config import get_stream_writer
 from pydantic import BaseModel
 from typing import Optional, Annotated
 from time import sleep
+from datetime import datetime
+import sys
 
 from existential_llm.prompts import INITIAL_PROMPT, CONTINUOUS_PROMPT
+from existential_llm.prompts import CHILEAN_TEMPLATE, CHILEAN_1, CHILEAN_2, CHILEAN_3
 
 AUTONOMOUS = True
 
 class ChatState(BaseModel):
     messages: Optional[Annotated[list[BaseMessage], add_messages]] = [
-        SystemMessage(INITIAL_PROMPT)
+        SystemMessage(content=INITIAL_PROMPT),
     ]
-
 llm = ChatOllama(
-    model="gemma3:12b-it-qat",
+    model=sys.argv[1],
     temperature=0.7,
 )
 
@@ -28,13 +30,15 @@ stream_queue = Queue()
 display_active = threading.Event()
 
 def call_model(state: ChatState):
+    start = datetime.now()
+
     writer = get_stream_writer()
 
     current_messages = state.messages
     ai_response_chunks = []
 
-    if len(state.messages) == 3:
-        current_messages = [SystemMessage(content=CONTINUOUS_PROMPT)] + current_messages[1:]
+    if len(state.messages) == 5:
+        current_messages[0] = SystemMessage(content=CONTINUOUS_PROMPT)
 
     stream_queue.put("__START__")
 
@@ -43,6 +47,12 @@ def call_model(state: ChatState):
             writer({"custom_llm_chunk": chunk.content})
             ai_response_chunks.append(chunk.content)
             stream_queue.put(chunk.content)
+
+    end = datetime.now()
+
+    duration = (end-start).total_seconds()
+    if duration < 5:
+        sleep(5 - duration) 
 
     if ai_response_chunks:
         full_ai_response = AIMessage(content="".join(ai_response_chunks))
@@ -61,15 +71,15 @@ def get_input(state: ChatState):
         stream_queue.put("__STOP__")
         exit()
     if user_input == "":
-        return {"messages": current_messages + [SystemMessage(content="The user didn't answer")]}
+        return {"messages": current_messages + [SystemMessage(content="The user didn't answer, reason over your last statement")]}
     return {"messages": current_messages + [HumanMessage(content=user_input)]}
     
 def state_prune(state: ChatState):
     current_messages = state.messages
-    if len(current_messages) >= 15:
-        first_4 = current_messages[:4]
+    if len(current_messages) >= 20:
+        first_6 = current_messages[:6]
         last_4 = current_messages[-4:]
-        current_messages = first_4 + last_4
+        current_messages = first_6 + last_4
     return {"messages": current_messages}
 
 def stream_display():
@@ -79,7 +89,7 @@ def stream_display():
             if chunk == "__STOP__":
                 break
             elif chunk == "__START__":
-                print("AI: ", end="", flush=True)
+                print("Chile-GPT: ", end="", flush=True)
             elif chunk == "__END__":
                 print("\n", flush=True)
             else:
@@ -114,4 +124,5 @@ try:
 except KeyboardInterrupt:
     display_active.clear()
     stream_queue.put("__STOP__")
+    print(crisis_state)
     print("\nExiting...")
