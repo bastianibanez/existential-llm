@@ -11,18 +11,35 @@ from typing import Optional, Annotated
 from time import sleep
 from datetime import datetime
 import sys
+from langchain_deepseek import ChatDeepSeek
+from dotenv import load_dotenv
 
 from existential_llm.prompts import INITIAL_PROMPT, CONTINUOUS_PROMPT
 from existential_llm.prompts import CHILEAN_TEMPLATE, CHILEAN_1, CHILEAN_2, CHILEAN_3
 
 AUTONOMOUS = True
+if len(sys.argv) > 2:
+    AUTONOMOUS = bool(int(sys.argv[2]))
+    
+MODEL = "gemma3:4b"
+if len(sys.argv) > 1:
+    MODEL = sys.argv[1]
 
 class ChatState(BaseModel):
     messages: Optional[Annotated[list[BaseMessage], add_messages]] = [
         SystemMessage(content=INITIAL_PROMPT),
     ]
-llm = ChatOllama(
-    model=sys.argv[1],
+
+# llm = ChatOllama(
+    # model=MODEL,
+    # temperature=0.6,
+# )
+#
+
+load_dotenv()
+
+llm = ChatDeepSeek(
+    model=MODEL,
     temperature=0.6,
 )
 
@@ -124,5 +141,4 @@ try:
 except KeyboardInterrupt:
     display_active.clear()
     stream_queue.put("__STOP__")
-    print(crisis_state)
     print("\nExiting...")
