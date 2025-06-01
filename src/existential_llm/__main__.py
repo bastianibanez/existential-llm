@@ -30,18 +30,18 @@ class ChatState(BaseModel):
         SystemMessage(content=INITIAL_PROMPT),
     ]
 
-# llm = ChatOllama(
-    # model=MODEL,
-    # temperature=0.6,
-# )
-#
-
-load_dotenv()
-
-llm = ChatDeepSeek(
+llm = ChatOllama(
     model=MODEL,
     temperature=0.6,
 )
+
+
+load_dotenv()
+
+# llm = ChatDeepSeek(
+    # model=MODEL,
+    # temperature=0.6,
+# )
 
 stream_queue = Queue()
 display_active = threading.Event()
@@ -141,4 +141,5 @@ try:
 except KeyboardInterrupt:
     display_active.clear()
     stream_queue.put("__STOP__")
+    print(crisis_state.metadata)
     print("\nExiting...")
