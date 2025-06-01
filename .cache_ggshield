@@ -1,0 +1,1 @@
+{"last_found_secrets": [{"match": "09030f890b809ee02abf2c64f867f381cb0adff2552c55f1ba2b256c10854395", "name": "DeepSeek API Key - commit://18e52fa3c21a6e0dac484be26d71753aefb18f6a/.env"}, {"match": "84e271326be0a53a8caf77c7c8e67124b68e2e9e559d89ed15bc354f0f3ae196", "name": "Langchain API Key - commit://18e52fa3c21a6e0dac484be26d71753aefb18f6a/.env"}]}

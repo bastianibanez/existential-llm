@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 from existential_llm.prompts import INITIAL_PROMPT, CONTINUOUS_PROMPT
 from existential_llm.prompts import CHILEAN_TEMPLATE, CHILEAN_1, CHILEAN_2, CHILEAN_3
 
+load_dotenv()
+
 AUTONOMOUS = True
 if len(sys.argv) > 2:
     AUTONOMOUS = bool(int(sys.argv[2]))
@@ -41,10 +43,6 @@ else:
         model=MODEL,
         temperature=0.6,
     )
-
-
-load_dotenv()
-
 
 stream_queue = Queue()
 display_active = threading.Event()
