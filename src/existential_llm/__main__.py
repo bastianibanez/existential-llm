@@ -30,18 +30,21 @@ class ChatState(BaseModel):
         SystemMessage(content=INITIAL_PROMPT),
     ]
 
-llm = ChatOllama(
-    model=MODEL,
-    temperature=0.6,
-)
+if not MODEL in ["deepseek-reasoner", "deepseek-chat"]:
+    llm = ChatOllama(
+        model=MODEL,
+        temperature=0.6,
+    )
+
+else:
+    llm = ChatDeepSeek(
+        model=MODEL,
+        temperature=0.6,
+    )
 
 
 load_dotenv()
 
-# llm = ChatDeepSeek(
-    # model=MODEL,
-    # temperature=0.6,
-# )
 
 stream_queue = Queue()
 display_active = threading.Event()
