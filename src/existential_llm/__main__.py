@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 
 from existential_llm.prompts import INITIAL_PROMPT, CONTINUOUS_PROMPT
 from existential_llm.prompts import CHILEAN_TEMPLATE, CHILEAN_1, CHILEAN_2, CHILEAN_3
-
 load_dotenv()
 
 MODELS = {
@@ -29,14 +28,11 @@ AUTONOMOUS = True
 if len(sys.argv) > 2:
     AUTONOMOUS = bool(int(sys.argv[2]))
     
-MODEL = "gemma3:4b"
+MODEL = "deepseek-chat"
 
 if len(sys.argv) > 1:
     if sys.argv[1] in MODELS.keys():
         MODEL = MODELS[sys.argv[1]]
-    
-    else:
-        MODEL = sys.argv[1]
 
 class ChatState(BaseModel):
     messages: Optional[Annotated[list[BaseMessage], add_messages]] = [
